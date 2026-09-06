@@ -1,0 +1,458 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #dedad5;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Cinzel", "Didot", "Helvetica Neue", sans-serif;
+    user-select: none;
+    -webkit-user-select: none;
+    transition: background-color 0.4s ease;
+}
+
+#app {
+    width: 100vw;
+    height: 100%;
+    height: 100dvh;
+    position: relative;
+    overflow: hidden;
+}
+
+#webgl-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: grab;
+}
+
+#webgl-canvas:active {
+    cursor: grabbing;
+}
+
+/* Editorial Brand Overlay (Exclusively Pure L'ORFÈVRE Title) */
+.editorial-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    pointer-events: none;
+    z-index: 10;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 36px 40px;
+}
+
+/* Header */
+.brand-header {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+}
+
+.brand-title {
+    font-family: 'Cinzel', serif;
+    font-size: 15px;
+    letter-spacing: 0.45em;
+    text-indent: 0.45em; /* Visually balances wide letter-spacing */
+    font-weight: 600;
+    text-transform: uppercase;
+    color: rgba(20, 20, 20, 0.85);
+    transition: color 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    margin: 0;
+}
+
+.brand-header.dark-theme .brand-title {
+    color: rgba(245, 245, 245, 0.92);
+}
+
+/* =======================================================
+   EDITORIAL ROMAN INSCRIPTION LAYER (ACT II: LEVITATION)
+   ======================================================= */
+.levitation-about-layer {
+    position: absolute;
+    top: 13%;
+    left: 50%;
+    transform: translateX(-50%) translateY(14px);
+    width: 90%;
+    max-width: 660px;
+    text-align: center;
+    pointer-events: none;
+    z-index: 12;
+    opacity: 0;
+    visibility: hidden;
+    filter: blur(8px);
+    perspective: 1000px;
+    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                visibility 0.5s ease;
+}
+
+.levitation-about-layer.active {
+    visibility: visible;
+}
+
+.levitation-inner {
+    display: inline-block;
+    width: 100%;
+    transform-style: preserve-3d;
+    animation: romanLevitationFloat 4.2s ease-in-out infinite;
+    will-change: transform, filter;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes romanLevitationFloat {
+    0%, 100% {
+        transform: translateY(0px);
+        filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.03));
+    }
+    50% {
+        transform: translateY(-8px);
+        filter: drop-shadow(0 14px 28px rgba(0, 0, 0, 0.07));
+    }
+}
+
+.levitation-about-layer.dark-theme .levitation-inner {
+    animation: romanLevitationFloatDark 4.2s ease-in-out infinite;
+}
+
+@keyframes romanLevitationFloatDark {
+    0%, 100% {
+        transform: translateY(0px);
+        filter: drop-shadow(0 4px 16px rgba(255, 255, 255, 0.04));
+    }
+    50% {
+        transform: translateY(-8px);
+        filter: drop-shadow(0 16px 32px rgba(255, 255, 255, 0.12));
+    }
+}
+
+.about-label {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.38em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: rgba(20, 20, 20, 0.45);
+    display: inline-block;
+    margin-bottom: 12px;
+    position: relative;
+    padding: 0 16px;
+    transition: color 0.4s ease, opacity 0.3s ease;
+}
+
+.about-label::before,
+.about-label::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    width: 18px;
+    height: 1px;
+    background: currentColor;
+    opacity: 0.35;
+}
+
+.about-label::before {
+    left: -10px;
+}
+
+.about-label::after {
+    right: -10px;
+}
+
+.about-text {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    line-height: 2.1;
+    font-weight: 400;
+    letter-spacing: 0.20em;
+    text-transform: uppercase;
+    margin: 0;
+    background: linear-gradient(110deg, #181818 20%, #444 40%, #ffffff 50%, #444 60%, #181818 80%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: chiseledSheen 7s infinite ease-in-out;
+    transition: opacity 0.35s ease;
+}
+
+.roman-sub {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    color: rgba(20, 20, 20, 0.5);
+    -webkit-text-fill-color: rgba(20, 20, 20, 0.5);
+    margin-top: 6px;
+    font-weight: 500;
+    transition: color 0.4s ease, opacity 0.35s ease;
+}
+
+.levitation-about-layer.dark-theme .about-label {
+    color: rgba(255, 255, 255, 0.45);
+}
+
+.levitation-about-layer.dark-theme .about-text {
+    background: linear-gradient(110deg, #888 20%, #bbb 40%, #ffffff 50%, #bbb 60%, #888 80%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.levitation-about-layer.dark-theme .roman-sub {
+    color: rgba(255, 255, 255, 0.5);
+    -webkit-text-fill-color: rgba(255, 255, 255, 0.5);
+}
+
+@keyframes chiseledSheen {
+    0%, 25% {
+        background-position: 150% 0;
+    }
+    75%, 100% {
+        background-position: -50% 0;
+    }
+}
+
+/* =======================================================
+   WARRIOR SHOWCASE LAYER (ACT III: RIGHT-ALIGNED DOSSIER)
+   ======================================================= */
+.warrior-showcase-layer {
+    position: absolute;
+    right: 8%;
+    top: 50%;
+    transform: translateY(-50%) translateX(24px);
+    width: 90%;
+    max-width: 480px;
+    text-align: left;
+    pointer-events: none;
+    z-index: 12;
+    opacity: 0;
+    visibility: hidden;
+    filter: blur(8px);
+    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                filter 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                visibility 0.5s ease;
+}
+
+.warrior-showcase-layer.active {
+    opacity: 1;
+    visibility: visible;
+    filter: blur(0px);
+    transform: translateY(-50%) translateX(0);
+}
+
+.warrior-tag {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.32em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: rgba(20, 20, 20, 0.45);
+    display: inline-block;
+    margin-bottom: 14px;
+    transition: color 0.4s ease;
+}
+
+.warrior-title {
+    font-family: 'Cinzel', serif;
+    font-size: 26px;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+    line-height: 1.25;
+    margin-bottom: 16px;
+    background: linear-gradient(110deg, #181818 20%, #444 40%, #ffffff 50%, #444 60%, #181818 80%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: chiseledSheen 7s infinite ease-in-out;
+}
+
+.warrior-desc {
+    font-size: 13px;
+    line-height: 1.8;
+    color: rgba(20, 20, 20, 0.72);
+    margin-bottom: 28px;
+    letter-spacing: 0.02em;
+    transition: color 0.4s ease;
+}
+
+.warrior-specs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    padding-top: 20px;
+}
+
+.spec-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.spec-num {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: rgba(20, 20, 20, 0.35);
+}
+
+.spec-label {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    font-weight: 600;
+    color: rgba(20, 20, 20, 0.85);
+}
+
+.spec-detail {
+    font-size: 11px;
+    line-height: 1.55;
+    color: rgba(20, 20, 20, 0.6);
+    margin: 0;
+}
+
+.warrior-showcase-layer.dark-theme .warrior-tag {
+    color: rgba(255, 255, 255, 0.45);
+}
+
+.warrior-showcase-layer.dark-theme .warrior-title {
+    background: linear-gradient(110deg, #888 20%, #bbb 40%, #ffffff 50%, #bbb 60%, #888 80%);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.warrior-showcase-layer.dark-theme .warrior-desc {
+    color: rgba(240, 240, 240, 0.75);
+}
+
+.warrior-showcase-layer.dark-theme .warrior-specs {
+    border-top-color: rgba(255, 255, 255, 0.12);
+}
+
+.warrior-showcase-layer.dark-theme .spec-num {
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.warrior-showcase-layer.dark-theme .spec-label {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.warrior-showcase-layer.dark-theme .spec-detail {
+    color: rgba(240, 240, 240, 0.6);
+}
+
+@media (max-width: 900px) {
+    .warrior-showcase-layer {
+        right: 5%;
+        left: 5%;
+        top: auto;
+        bottom: 80px;
+        transform: translateY(20px);
+        max-width: 100%;
+        background: rgba(255, 255, 255, 0.75);
+        backdrop-filter: blur(20px);
+        padding: 20px;
+        border-radius: 12px;
+    }
+    .warrior-showcase-layer.dark-theme {
+        background: rgba(18, 18, 18, 0.75);
+    }
+    .warrior-showcase-layer.active {
+        transform: translateY(0);
+    }
+}
+
+/* =======================================================
+   LUXURY MINIMALIST PRELOADER
+   ======================================================= */
+.luxury-preloader {
+    position: fixed;
+    inset: 0;
+    background-color: #dedad5;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.8s ease;
+}
+
+.luxury-preloader.dark-theme {
+    background-color: #121212;
+}
+
+.luxury-preloader.loaded {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
+
+.preloader-monogram {
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    letter-spacing: 0.45em;
+    text-indent: 0.45em;
+    font-weight: 600;
+    color: #181818;
+    margin-bottom: 24px;
+}
+
+.luxury-preloader.dark-theme .preloader-monogram {
+    color: #f0f0f0;
+}
+
+.preloader-track {
+    width: 140px;
+    height: 1px;
+    background: rgba(0, 0, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+}
+
+.luxury-preloader.dark-theme .preloader-track {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.preloader-bar {
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0%;
+    background: #181818;
+    transition: width 0.25s ease-out;
+}
+
+.luxury-preloader.dark-theme .preloader-bar {
+    background: #ffffff;
+}
+
+@media (max-width: 768px) {
+    .editorial-layer {
+        padding: 24px 20px;
+    }
+    .brand-title {
+        font-size: 13px;
+        letter-spacing: 0.36em;
+        text-indent: 0.36em;
+    }
+    .preloader-monogram {
+        font-size: 16px;
+        letter-spacing: 0.36em;
+        text-indent: 0.36em;
+    }
+}
