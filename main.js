@@ -15,16 +15,59 @@ document.addEventListener('DOMContentLoaded', () => {
     const app = document.getElementById('app') || document.body;
     app.innerHTML = '';
 
-    // 0. Luxury Minimalist Preloader
+    // 0. Luxury Archival Roman Preloader
     const preloader = document.createElement('div');
     preloader.className = 'luxury-preloader';
     preloader.id = 'luxury-preloader';
     preloader.innerHTML = `
-        <div class="preloader-monogram">L'ORFÈVRE</div>
-        <div class="preloader-track"><div class="preloader-bar" id="preloader-bar"></div></div>
+        <div class="preloader-slab preloader-slab-left"></div>
+        <div class="preloader-slab preloader-slab-right"></div>
+        
+        <div class="preloader-content">
+            <div class="preloader-corner preloader-corner-tl">LAT 44.0535° N · LON 10.1417° E</div>
+            <div class="preloader-corner preloader-corner-tr">ROMA · MMXXVI</div>
+            <div class="preloader-corner preloader-corner-bl">SPECIMEN NO. 01 / 02</div>
+            <div class="preloader-corner preloader-corner-br">ARCHIVIO CAPITOLINO</div>
+
+            <div class="preloader-center">
+                <div class="preloader-kicker">SCULPTURAL EYEWEAR</div>
+                <div class="preloader-monogram">L'ORFÈVRE</div>
+                
+                <div class="preloader-numerals">
+                    <span class="roman-num" id="r-num-1">I</span>
+                    <span class="roman-sep">·</span>
+                    <span class="roman-num" id="r-num-2">II</span>
+                    <span class="roman-sep">·</span>
+                    <span class="roman-num" id="r-num-3">III</span>
+                    <span class="roman-sep">·</span>
+                    <span class="roman-num" id="r-num-4">IV</span>
+                    <span class="roman-sep">·</span>
+                    <span class="roman-num" id="r-num-5">V</span>
+                    <span class="roman-sep">·</span>
+                    <span class="roman-num" id="r-num-6">VI</span>
+                </div>
+
+                <div class="preloader-gauge">
+                    <div class="preloader-rule"><div class="preloader-fill" id="preloader-fill"></div></div>
+                    <div class="preloader-percentage" id="preloader-percentage">00%</div>
+                </div>
+
+                <div class="preloader-status" id="preloader-status">INITIALIZING ARCHIVAL DOSSIER...</div>
+
+                <div class="preloader-enter-container">
+                    <button class="preloader-enter-btn" id="preloader-enter-btn">
+                        <span class="enter-main">ENTER ARCHIVE</span>
+                        <span class="enter-sub">CLICK TO UNVEIL · WITH SOUND</span>
+                    </button>
+                </div>
+            </div>
+        </div>
     `;
     app.appendChild(preloader);
-    const preloaderBar = document.getElementById('preloader-bar');
+    const preloaderFill = document.getElementById('preloader-fill');
+    const preloaderPercentage = document.getElementById('preloader-percentage');
+    const preloaderStatus = document.getElementById('preloader-status');
+    const preloaderEnterBtn = document.getElementById('preloader-enter-btn');
 
     // 1. WebGL Canvas
     const canvas = document.createElement('canvas');
@@ -235,8 +278,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const startAmbient = () => {
         if (!audioEnabled || ambientPlaying || !audioCtx || !soundBuffers['ambient']) return;
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume().then(() => {
+                if (audioCtx.state === 'running' && !ambientPlaying && audioEnabled && soundBuffers['ambient']) {
+                    startAmbient();
+                }
+            }).catch(() => {});
+            return;
+        }
+
         try {
-            if (audioCtx.state === 'suspended') audioCtx.resume();
+            if (ambientSource) {
+                try { ambientSource.stop(); } catch (e) {}
+                ambientSource.disconnect();
+                ambientSource = null;
+            }
 
             ambientSource = audioCtx.createBufferSource();
             ambientSource.buffer = soundBuffers['ambient'];
@@ -248,12 +304,12 @@ document.addEventListener('DOMContentLoaded', () => {
             ambientFilter.Q.setValueAtTime(1.2, audioCtx.currentTime);
 
             ambientGain = audioCtx.createGain();
-            ambientGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-            ambientGain.gain.linearRampToValueAtTime(0.22, audioCtx.currentTime + 1.2);
+            ambientGain.gain.setValueAtTime(0.001, audioCtx.currentTime);
+            ambientGain.gain.exponentialRampToValueAtTime(0.22, audioCtx.currentTime + 0.8);
 
             ambientSource.connect(ambientFilter);
             ambientFilter.connect(ambientGain);
-            ambientGain.connect(ambientDuckGain);
+            ambientGain.connect(ambientDuckGain || masterGain);
 
             ambientSource.start(0);
             ambientPlaying = true;
@@ -385,18 +441,44 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const unlockAudio = () => {
-        initAudio();
-        if (audioCtx && audioCtx.state === 'suspended') {
-            audioCtx.resume();
+        if (!isAudioInitialized) {
+            initAudio();
         }
-        if (audioEnabled && !ambientPlaying && soundBuffers['ambient']) {
-            startAmbient();
+        if (audioCtx) {
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume().then(() => {
+                    if (audioEnabled && !ambientPlaying && soundBuffers['ambient']) {
+                        startAmbient();
+                    }
+                }).catch(() => {});
+            } else if (audioCtx.state === 'running') {
+                if (audioEnabled && !ambientPlaying && soundBuffers['ambient']) {
+                    startAmbient();
+                }
+            }
         }
     };
 
-    ['click', 'wheel', 'touchstart', 'keydown', 'pointerdown'].forEach(evt => {
-        window.addEventListener(evt, unlockAudio, { once: true, passive: true });
-    });
+    // Preload and decode all audio assets immediately so they are in RAM during preloader
+    initAudio();
+
+    const userGestureEvents = ['click', 'pointerdown', 'touchstart', 'wheel', 'keydown', 'scroll'];
+    const handleUserGesture = () => {
+        unlockAudio();
+        if (audioCtx && audioCtx.state === 'running' && audioEnabled && !ambientPlaying) {
+            startAmbient();
+            playRomanSound('pedestal');
+        }
+        if (ambientPlaying && audioCtx && audioCtx.state === 'running') {
+            userGestureEvents.forEach(evt => window.removeEventListener(evt, handleUserGesture));
+        }
+    };
+    userGestureEvents.forEach(evt => window.addEventListener(evt, handleUserGesture, { passive: true }));
+
+    // Prime audio when user touches or clicks anywhere on the preloader
+    if (preloader) {
+        preloader.addEventListener('pointerdown', () => unlockAudio(), { passive: true });
+    }
 
     const flashAudioPulse = () => {
         if (!audioBtn) return;
@@ -489,9 +571,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     audioBtn.addEventListener('click', () => {
         unlockAudio();
+        const label = audioBtn.querySelector('#audio-label');
+
+        // If audio was silent or suspended, activate immediately on first click
+        if (!ambientPlaying || (audioCtx && audioCtx.state !== 'running')) {
+            audioEnabled = true;
+            audioBtn.classList.remove('muted');
+            if (label) label.textContent = 'SOUND · ON';
+            if (masterGain && audioCtx) {
+                masterGain.gain.setValueAtTime(1.0, audioCtx.currentTime);
+            }
+            startAmbient();
+            playRomanSound('morph');
+            return;
+        }
+
         audioEnabled = !audioEnabled;
         audioBtn.classList.toggle('muted', !audioEnabled);
-        const label = audioBtn.querySelector('#audio-label');
         if (label) label.textContent = audioEnabled ? 'SOUND · ON' : 'SOUND · OFF';
         if (masterGain && audioCtx) {
             masterGain.gain.setTargetAtTime(audioEnabled ? 1.0 : 0.0, audioCtx.currentTime, 0.05);
@@ -545,6 +641,107 @@ document.addEventListener('DOMContentLoaded', () => {
     let texturesLoaded = 0;
     const totalTextures = 6;
     let initialRenderTriggered = false;
+    let targetProgress = 0;
+    let displayedProgress = 0;
+    let preloaderCompleted = false;
+
+    const ARCHIVAL_TELEMETRY = [
+        "ACQUIRING APUAN CALCITE SLAB...",
+        "SCLEROMETRIC MINERAL MAPPING...",
+        "ZEISS OPTICAL REFRACTIVE CALIBRATION...",
+        "QUARRYING NERO MARQUINA BASALT...",
+        "CHISELING TITANIUM CORE FILIGREE...",
+        "HARMONIC EQUILIBRIUM ACHIEVED."
+    ];
+
+    // Smooth Decimal Interpolation Loop
+    const updatePreloaderProgress = () => {
+        if (preloaderCompleted) return;
+
+        // Easing interpolation towards targetProgress
+        displayedProgress += (targetProgress - displayedProgress) * 0.12;
+        if (texturesLoaded === totalTextures && 100 - displayedProgress < 0.8) {
+            displayedProgress = 100;
+        }
+
+        if (preloaderFill) {
+            preloaderFill.style.width = `${Math.min(100, displayedProgress)}%`;
+        }
+        if (preloaderPercentage) {
+            const intVal = Math.min(100, Math.floor(displayedProgress));
+            preloaderPercentage.textContent = `${intVal < 10 ? '0' + intVal : intVal}%`;
+        }
+
+        // When all 6 textures are loaded and visual progress has completed
+        if (texturesLoaded === totalTextures && displayedProgress >= 100) {
+            preloaderCompleted = true;
+            if (preloaderFill) preloaderFill.style.width = '100%';
+            if (preloaderPercentage) preloaderPercentage.textContent = '100%';
+            if (preloaderStatus) preloaderStatus.textContent = 'ARCHIVE UNLOCKED · ENTERING SANCTUM';
+
+            // Fully illuminate all Roman numerals
+            for (let i = 1; i <= 6; i++) {
+                const r = document.getElementById(`r-num-${i}`);
+                if (r) r.classList.add('active');
+            }
+
+            let partingTriggered = false;
+            const triggerParting = () => {
+                if (partingTriggered) return;
+                partingTriggered = true;
+
+                // 1. Unconditionally resume AudioContext and trigger entrance acoustics
+                if (!isAudioInitialized) initAudio();
+                if (audioCtx) {
+                    if (audioCtx.state === 'suspended') {
+                        audioCtx.resume().then(() => {
+                            if (audioEnabled) {
+                                startAmbient();
+                                playRomanSound('pedestal');
+                            }
+                        }).catch(() => {});
+                    } else {
+                        if (audioEnabled) {
+                            startAmbient();
+                            playRomanSound('pedestal');
+                        }
+                    }
+                }
+
+                // 2. Monolithic Slabs Parting Animation
+                if (preloader) preloader.classList.add('parting');
+                setTimeout(() => {
+                    if (preloader) preloader.classList.add('loaded');
+                }, 1250);
+            };
+
+            // If audio is already playing (autoplay permitted or user clicked during load)
+            if (ambientPlaying && audioCtx && audioCtx.state === 'running') {
+                setTimeout(triggerParting, 350);
+            } else {
+                // Show "ENTER ARCHIVE" prompt so the user's click unlocks Web Audio
+                if (preloader) {
+                    preloader.classList.add('ready-to-enter');
+                    preloader.addEventListener('click', triggerParting, { once: true });
+                }
+                if (preloaderEnterBtn) {
+                    preloaderEnterBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        triggerParting();
+                    }, { once: true });
+                }
+
+                // Auto-enter fallback after 2.8s in case user doesn't interact
+                setTimeout(() => {
+                    if (!partingTriggered) triggerParting();
+                }, 2800);
+            }
+            return;
+        }
+
+        requestAnimationFrame(updatePreloaderProgress);
+    };
+    requestAnimationFrame(updatePreloaderProgress);
 
     const configureTexture = (tex) => {
         tex.colorSpace = THREE.NoColorSpace;
@@ -554,19 +751,20 @@ document.addEventListener('DOMContentLoaded', () => {
         tex.anisotropy = maxAnisotropy;
         texturesLoaded++;
 
-        if (preloaderBar) {
-            preloaderBar.style.width = `${(texturesLoaded / totalTextures) * 100}%`;
+        // Ignite active Roman numeral
+        const romanEl = document.getElementById(`r-num-${texturesLoaded}`);
+        if (romanEl) romanEl.classList.add('active');
+
+        // Update archival status text
+        if (preloaderStatus && ARCHIVAL_TELEMETRY[texturesLoaded - 1]) {
+            preloaderStatus.textContent = ARCHIVAL_TELEMETRY[texturesLoaded - 1];
         }
+
+        targetProgress = (texturesLoaded / totalTextures) * 100;
 
         if (texturesLoaded >= 2 && !initialRenderTriggered) {
             initialRenderTriggered = true;
             renderFrame();
-        }
-
-        if (texturesLoaded === totalTextures) {
-            setTimeout(() => {
-                if (preloader) preloader.classList.add('loaded');
-            }, 250);
         }
     };
 
