@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import gsap from 'gsap';
+import { injectSpeedInsights } from '@vercel/speed-insights';
 
 // 3 Master Showcase Acts - Carrara White Edition
 import whitePedestalImg from './images/step1_white_pedestal.png';
@@ -10,6 +11,9 @@ import whiteWarriorImg  from './images/step5_white_warrior.png';
 import blackPedestalImg from './images/step1_black_pedestal.png';
 import blackLevitateImg from './images/step3_black_floating.png';
 import blackWarriorImg  from './images/step5_black_warrior.png';
+
+// Initialize Vercel Speed Insights
+injectSpeedInsights();
 
 document.addEventListener('DOMContentLoaded', () => {
     const app = document.getElementById('app') || document.body;
