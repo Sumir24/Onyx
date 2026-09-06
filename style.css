@@ -456,3 +456,139 @@ body {
         text-indent: 0.36em;
     }
 }
+
+/* =======================================================
+   FLANKING GUIDANCE CUES (LEFT & RIGHT OF PILLAR)
+   ======================================================= */
+.flanking-guidance-layer {
+    position: fixed;
+    bottom: 48px;
+    left: 0;
+    width: 100%;
+    padding: 0 7vw;
+    z-index: 500;
+    pointer-events: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    opacity: 1;
+    transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+.flank-action {
+    pointer-events: auto;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    position: relative;
+    padding: 6px 0;
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.flank-text {
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    letter-spacing: 0.40em;
+    text-indent: 0.40em;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: #111111;
+    text-shadow: 0 1px 14px rgba(255, 255, 255, 0.95), 0 0 4px rgba(255, 255, 255, 0.85);
+    transition: color 0.3s ease, opacity 0.3s ease;
+}
+
+.flank-action::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0.40em;
+    right: 0;
+    height: 1px;
+    background: currentColor;
+    opacity: 0;
+    transform: scaleX(0.6);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.flank-action:hover::after {
+    opacity: 0.75;
+    transform: scaleX(1);
+}
+
+.flank-action:hover {
+    transform: translateY(-2px);
+}
+
+.flank-glyph {
+    font-size: 13px;
+    line-height: 1;
+    color: #111111;
+    transition: transform 0.4s ease, color 0.3s ease;
+}
+
+.flank-action:hover .flank-glyph {
+    transform: rotate(180deg);
+}
+
+.flank-arrow {
+    font-size: 15px;
+    line-height: 1;
+    color: #111111;
+    animation: flankArrowPulse 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    text-shadow: 0 1px 10px rgba(255, 255, 255, 0.9);
+    transition: color 0.3s ease;
+}
+
+/* Dark Theme Adaptation */
+.flanking-guidance-layer.dark-theme .flank-text,
+.flanking-guidance-layer.dark-theme .flank-glyph,
+.flanking-guidance-layer.dark-theme .flank-arrow {
+    color: #ffffff;
+    text-shadow: 0 0 16px rgba(255, 255, 255, 0.45), 0 2px 6px rgba(0, 0, 0, 0.9);
+}
+
+.flank-action:hover .flank-text,
+.flank-action:hover .flank-glyph,
+.flank-action:hover .flank-arrow {
+    color: #000000;
+}
+
+.flanking-guidance-layer.dark-theme .flank-action:hover .flank-text,
+.flanking-guidance-layer.dark-theme .flank-action:hover .flank-glyph,
+.flanking-guidance-layer.dark-theme .flank-action:hover .flank-arrow {
+    color: #ffffff;
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+}
+
+@keyframes flankArrowPulse {
+    0%, 100% {
+        transform: translateY(0);
+        opacity: 0.7;
+    }
+    50% {
+        transform: translateY(5px);
+        opacity: 1;
+    }
+}
+
+@media (max-width: 768px) {
+    .flanking-guidance-layer {
+        bottom: 28px;
+        padding: 0 20px;
+    }
+    .flank-text {
+        font-size: 9.5px;
+        letter-spacing: 0.28em;
+        text-indent: 0.28em;
+    }
+    .flank-glyph {
+        font-size: 11px;
+    }
+    .flank-arrow {
+        font-size: 13px;
+    }
+}

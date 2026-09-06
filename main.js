@@ -85,6 +85,39 @@ document.addEventListener('DOMContentLoaded', () => {
     `;
     app.appendChild(overlay);
 
+    // 5. Flanking Interactive Guidance Cues (Left & Right of Pillar)
+    const scrollCue = document.createElement('div');
+    scrollCue.className = 'flanking-guidance-layer';
+    scrollCue.id = 'flanking-guidance-layer';
+    scrollCue.innerHTML = `
+        <div class="flank-action flank-left" id="flank-morph-btn" title="Toggle Marble Edition">
+            <span class="flank-glyph">◐</span>
+            <span class="flank-text">CLICK TO MORPH</span>
+        </div>
+        <div class="flank-action flank-right" id="flank-scroll-btn" title="Scroll to Explore">
+            <span class="flank-text">SCROLL</span>
+            <span class="flank-arrow">↓</span>
+        </div>
+    `;
+    app.appendChild(scrollCue);
+
+    const morphActionBtn = scrollCue.querySelector('#flank-morph-btn');
+    const scrollActionBtn = scrollCue.querySelector('#flank-scroll-btn');
+
+    if (morphActionBtn) {
+        morphActionBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            toggleEdition();
+        });
+    }
+
+    if (scrollActionBtn) {
+        scrollActionBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            smoothScrollTo(1.0, 0.85);
+        });
+    }
+
     // DOM References
     const header = overlay.querySelector('.brand-header');
     const levitationInner = document.getElementById('levitation-inner');
@@ -532,6 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (preloader) preloader.classList.toggle('dark-theme', isDark);
         if (levitationAbout) levitationAbout.classList.toggle('dark-theme', isDark);
         if (warriorShowcase) warriorShowcase.classList.toggle('dark-theme', isDark);
+        if (scrollCue) scrollCue.classList.toggle('dark-theme', isDark);
 
         // Stone Narrative Inversion for Inscription Layer (Act II)
         if (aboutLabel && aboutMain && aboutSub) {
@@ -831,6 +865,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 warriorShowcase.style.transform = 'translateY(-50%) translateX(24px)';
                 warriorShowcase.classList.remove('active');
             }
+        }
+
+        // 3. Archival Scroll Indicator Fade-Out (Act I -> Act II)
+        if (scrollCue) {
+            const cueOpacity = Math.max(1.0 - curScroll * 3.2, 0.0);
+            scrollCue.style.opacity = cueOpacity.toString();
+            scrollCue.style.pointerEvents = cueOpacity > 0.15 ? 'auto' : 'none';
+            scrollCue.style.transform = `translateY(${(1.0 - cueOpacity) * 8}px)`;
         }
 
         renderer.render(scene, camera);
