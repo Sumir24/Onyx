@@ -279,12 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const startAmbient = () => {
         if (!audioEnabled || ambientPlaying || !audioCtx || !soundBuffers['ambient']) return;
         if (audioCtx.state === 'suspended') {
-            audioCtx.resume().then(() => {
-                if (audioCtx.state === 'running' && !ambientPlaying && audioEnabled && soundBuffers['ambient']) {
-                    startAmbient();
-                }
-            }).catch(() => {});
-            return;
+            try { audioCtx.resume().catch(() => {}); } catch (e) {}
         }
 
         try {
@@ -305,7 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             ambientGain = audioCtx.createGain();
             ambientGain.gain.setValueAtTime(0.001, audioCtx.currentTime);
-            ambientGain.gain.exponentialRampToValueAtTime(0.22, audioCtx.currentTime + 0.8);
+            ambientGain.gain.setTargetAtTime(0.22, audioCtx.currentTime, 0.35);
 
             ambientSource.connect(ambientFilter);
             ambientFilter.connect(ambientGain);
@@ -692,20 +687,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // 1. Unconditionally resume AudioContext and trigger entrance acoustics
                 if (!isAudioInitialized) initAudio();
-                if (audioCtx) {
-                    if (audioCtx.state === 'suspended') {
-                        audioCtx.resume().then(() => {
-                            if (audioEnabled) {
-                                startAmbient();
-                                playRomanSound('pedestal');
-                            }
-                        }).catch(() => {});
-                    } else {
-                        if (audioEnabled) {
-                            startAmbient();
-                            playRomanSound('pedestal');
-                        }
-                    }
+                if (audioCtx && audioCtx.state === 'suspended') {
+                    try { audioCtx.resume().catch(() => {}); } catch (e) {}
+                }
+                if (audioEnabled) {
+                    startAmbient();
+                    playRomanSound('pedestal');
                 }
 
                 // 2. Monolithic Slabs Parting Animation
@@ -719,7 +706,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (ambientPlaying && audioCtx && audioCtx.state === 'running') {
                 setTimeout(triggerParting, 350);
             } else {
-                // Show "ENTER ARCHIVE" prompt so the user's click unlocks Web Audio
+                // Show "ENTER ARCHIVE" prompt so user interaction unlocks Web Audio
                 if (preloader) {
                     preloader.classList.add('ready-to-enter');
                     preloader.addEventListener('click', triggerParting, { once: true });
@@ -731,10 +718,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     }, { once: true });
                 }
 
-                // Auto-enter fallback after 2.8s in case user doesn't interact
+                // Also allow scrolling the wheel or pressing Enter/Space to enter with audio
+                const onEnterInput = (e) => {
+                    if (partingTriggered) return;
+                    if (e.type === 'wheel' || e.code === 'Space' || e.code === 'Enter' || e.key === 'ArrowDown') {
+                        window.removeEventListener('wheel', onEnterInput);
+                        window.removeEventListener('keydown', onEnterInput);
+                        triggerParting();
+                    }
+                };
+                window.addEventListener('wheel', onEnterInput, { passive: true });
+                window.addEventListener('keydown', onEnterInput, { passive: true });
+
+                // Generous timeout (8s) so user has time to click, but page never gets stuck
                 setTimeout(() => {
                     if (!partingTriggered) triggerParting();
-                }, 2800);
+                }, 8000);
             }
             return;
         }
