@@ -118,6 +118,392 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // 6. Minimalist Roman Gallery Acoustic Controls
+    const audioBtn = document.createElement('button');
+    audioBtn.className = 'audio-toggle-btn';
+    audioBtn.id = 'audio-toggle';
+    audioBtn.setAttribute('title', 'Toggle Roman Gallery Acoustics');
+    audioBtn.innerHTML = `
+        <div class="audio-indicator-glyph">
+            <div class="audio-equalizer" id="audio-eq" aria-hidden="true">
+                <span class="eq-bar"></span>
+                <span class="eq-bar"></span>
+                <span class="eq-bar"></span>
+                <span class="eq-bar"></span>
+            </div>
+            <svg class="audio-speaker-svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+                <path class="audio-arc arc-outer" d="M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+                <path class="audio-arc arc-far" d="M19.07 4.93a10 10 0 0 1 0 14.14"></path>
+                <line class="audio-mute-slash" x1="22" y1="2" x2="2" y2="22"></line>
+            </svg>
+        </div>
+        <span class="audio-label" id="audio-label">SOUND · ON</span>
+    `;
+    app.appendChild(audioBtn);
+    const eqBars = audioBtn.querySelectorAll('.eq-bar');
+
+    // =======================================================
+    // ARCHIVAL ROMAN ACOUSTIC ENGINE 2.0 (STUDIO MASTERED)
+    // =======================================================
+    let audioCtx = null;
+    let audioEnabled = true;
+    let isAudioInitialized = false;
+    let activePhaseIndex = 0; // 0: Pedestal, 1: Levitation, 2: Warrior
+    let lastPhaseShiftTime = 0;
+    const PHASE_COOLDOWN = 850; // ms to prevent boundary clatter
+    let pulseTimeout = null;
+
+    // Master Audio Graph Nodes
+    let masterGain = null;
+    let masterCompressor = null;
+    let masterAnalyser = null;
+    let freqData = null;
+    let spatialPanner = null;
+    let reverbConvolver = null;
+    let reverbGain = null;
+    let ambientDuckGain = null;
+
+    let ambientSource = null;
+    let ambientGain = null;
+    let ambientFilter = null;
+    let ambientPlaying = false;
+
+    const audioBase = (import.meta.env.BASE_URL || '/').replace(/\/$/, '') + '/audio/';
+
+    const soundConfigs = {
+        ambient: { url: `${audioBase}roman_ambient.m4a?v=2`, fallback: `${audioBase}roman_ambient.wav?v=2`, vol: 0.22 },
+        morph: { url: `${audioBase}roman_morph.m4a?v=orig`, fallback: `${audioBase}roman_morph.wav?v=orig`, vol: 0.70 },
+        levitation: { url: `${audioBase}roman_levitation.m4a`, fallback: `${audioBase}roman_levitation.wav`, vol: 0.36 },
+        warrior: { url: `${audioBase}roman_warrior.m4a?v=2`, fallback: `${audioBase}roman_warrior.wav?v=2`, vol: 0.58 },
+        pedestal: { url: `${audioBase}roman_pedestal.m4a`, fallback: `${audioBase}roman_pedestal.wav`, vol: 0.50 }
+    };
+
+    const soundBuffers = {};
+    const audioElements = {};
+
+    // Pre-instantiate HTML5 Audio elements for zero-latency instant fallback
+    Object.entries(soundConfigs).forEach(([key, cfg]) => {
+        if (key === 'ambient') return;
+        try {
+            const el = new Audio();
+            el.preload = 'auto';
+            el.volume = cfg.vol;
+            el.src = cfg.url;
+            audioElements[key] = el;
+        } catch (e) {}
+    });
+
+    // Procedural Impulse Response for Roman Marble Hall Acoustic Tail
+    const createImpulseResponse = (ctx, duration = 0.85, decay = 2.4) => {
+        const sampleRate = ctx.sampleRate;
+        const length = Math.floor(sampleRate * duration);
+        const impulse = ctx.createBuffer(2, length, sampleRate);
+        const left = impulse.getChannelData(0);
+        const right = impulse.getChannelData(1);
+
+        for (let i = 0; i < length; i++) {
+            const n = i / length;
+            const env = Math.pow(1 - n, decay);
+            left[i] = (Math.random() * 2 - 1) * env;
+            right[i] = (Math.random() * 2 - 1) * env;
+        }
+
+        for (let ch = 0; ch < 2; ch++) {
+            const data = impulse.getChannelData(ch);
+            let prev = 0;
+            for (let i = 0; i < length; i++) {
+                data[i] = (data[i] + prev * 0.45) * 0.7;
+                prev = data[i];
+            }
+        }
+        return impulse;
+    };
+
+    // Smooth Musical Sidechain Ducking with Asymptotic Release (Zero Late Pump)
+    const triggerDucking = (depth = 0.60, holdTime = 0.35, releaseTau = 0.38) => {
+        if (!ambientDuckGain || !audioCtx) return;
+        const now = audioCtx.currentTime;
+        try {
+            ambientDuckGain.gain.cancelScheduledValues(now);
+            ambientDuckGain.gain.setValueAtTime(ambientDuckGain.gain.value, now);
+            ambientDuckGain.gain.linearRampToValueAtTime(depth, now + 0.05);
+            ambientDuckGain.gain.setValueAtTime(depth, now + holdTime);
+            ambientDuckGain.gain.setTargetAtTime(1.0, now + holdTime, releaseTau);
+        } catch (e) {}
+    };
+
+    const startAmbient = () => {
+        if (!audioEnabled || ambientPlaying || !audioCtx || !soundBuffers['ambient']) return;
+        try {
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            ambientSource = audioCtx.createBufferSource();
+            ambientSource.buffer = soundBuffers['ambient'];
+            ambientSource.loop = true;
+
+            ambientFilter = audioCtx.createBiquadFilter();
+            ambientFilter.type = 'lowpass';
+            ambientFilter.frequency.setValueAtTime(650, audioCtx.currentTime);
+            ambientFilter.Q.setValueAtTime(1.2, audioCtx.currentTime);
+
+            ambientGain = audioCtx.createGain();
+            ambientGain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+            ambientGain.gain.linearRampToValueAtTime(0.22, audioCtx.currentTime + 1.2);
+
+            ambientSource.connect(ambientFilter);
+            ambientFilter.connect(ambientGain);
+            ambientGain.connect(ambientDuckGain);
+
+            ambientSource.start(0);
+            ambientPlaying = true;
+        } catch (e) {
+            console.warn('Ambient start error:', e);
+        }
+    };
+
+    const stopAmbient = () => {
+        if (!ambientPlaying || !ambientGain || !audioCtx) return;
+        try {
+            ambientGain.gain.setValueAtTime(ambientGain.gain.value, audioCtx.currentTime);
+            ambientGain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.6);
+            setTimeout(() => {
+                if (ambientSource) {
+                    try { ambientSource.stop(); } catch (e) {}
+                    ambientSource.disconnect();
+                    ambientSource = null;
+                }
+                ambientPlaying = false;
+            }, 650);
+        } catch (e) {}
+    };
+
+    const initAudio = async () => {
+        if (isAudioInitialized) return;
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            audioCtx = new AudioContext();
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            // 1. Master Output Bus Architecture
+            masterGain = audioCtx.createGain();
+            masterGain.gain.setValueAtTime(1.0, audioCtx.currentTime);
+
+            masterCompressor = audioCtx.createDynamicsCompressor();
+            masterCompressor.threshold.setValueAtTime(-18, audioCtx.currentTime);
+            masterCompressor.knee.setValueAtTime(24, audioCtx.currentTime);
+            masterCompressor.ratio.setValueAtTime(4.5, audioCtx.currentTime);
+            masterCompressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+            masterCompressor.release.setValueAtTime(0.2, audioCtx.currentTime);
+
+            masterAnalyser = audioCtx.createAnalyser();
+            masterAnalyser.fftSize = 64;
+            masterAnalyser.smoothingTimeConstant = 0.82;
+            freqData = new Uint8Array(masterAnalyser.frequencyBinCount);
+
+            masterGain.connect(masterCompressor);
+            masterCompressor.connect(masterAnalyser);
+            masterAnalyser.connect(audioCtx.destination);
+
+            // 2. Spatial 3D Stereo Panner
+            if (audioCtx.createStereoPanner) {
+                spatialPanner = audioCtx.createStereoPanner();
+                spatialPanner.connect(masterGain);
+            }
+
+            // 3. Roman Marble Hall Convolver Reverb Bus
+            reverbConvolver = audioCtx.createConvolver();
+            reverbConvolver.buffer = createImpulseResponse(audioCtx, 0.85, 2.4);
+            reverbGain = audioCtx.createGain();
+            reverbGain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+            reverbConvolver.connect(reverbGain);
+            reverbGain.connect(masterGain);
+
+            // 4. Ambient Ducking Node
+            ambientDuckGain = audioCtx.createGain();
+            ambientDuckGain.gain.setValueAtTime(1.0, audioCtx.currentTime);
+            ambientDuckGain.connect(masterGain);
+
+            isAudioInitialized = true;
+
+            // Apply equal-power sinusoidal micro-crossfade to ambient buffer so loop repeats with zero seam
+            const makeSeamlessLoopBuffer = (buf) => {
+                if (!buf) return buf;
+                const numChannels = buf.numberOfChannels;
+                const sampleRate = buf.sampleRate;
+                const crossfadeLength = Math.min(Math.floor(sampleRate * 0.05), Math.floor(buf.length * 0.05)); // 50ms
+                if (crossfadeLength <= 0) return buf;
+
+                for (let ch = 0; ch < numChannels; ch++) {
+                    const data = buf.getChannelData(ch);
+                    const len = data.length;
+                    for (let i = 0; i < crossfadeLength; i++) {
+                        const t = i / crossfadeLength;
+                        const gainIn = Math.sin((t * Math.PI) / 2);
+                        const gainOut = Math.cos((t * Math.PI) / 2);
+                        const head = data[i];
+                        const tail = data[len - crossfadeLength + i];
+                        const blended = head * gainIn + tail * gainOut;
+                        data[i] = blended;
+                        data[len - crossfadeLength + i] = blended;
+                    }
+                }
+                return buf;
+            };
+
+            // Pre-decode high-definition AudioBuffers in parallel
+            await Promise.allSettled(Object.entries(soundConfigs).map(async ([key, cfg]) => {
+                try {
+                    const res = await fetch(cfg.url);
+                    if (!res.ok) throw new Error('fetch failed');
+                    const arrayBuf = await res.arrayBuffer();
+                    let decoded = await audioCtx.decodeAudioData(arrayBuf);
+                    if (key === 'ambient') decoded = makeSeamlessLoopBuffer(decoded);
+                    soundBuffers[key] = decoded;
+                    if (key === 'ambient' && audioEnabled && !ambientPlaying) {
+                        startAmbient();
+                    }
+                } catch (e) {
+                    try {
+                        const resWav = await fetch(cfg.fallback);
+                        const arrayBufWav = await resWav.arrayBuffer();
+                        let decodedWav = await audioCtx.decodeAudioData(arrayBufWav);
+                        if (key === 'ambient') decodedWav = makeSeamlessLoopBuffer(decodedWav);
+                        soundBuffers[key] = decodedWav;
+                        if (key === 'ambient' && audioEnabled && !ambientPlaying) {
+                            startAmbient();
+                        }
+                    } catch (err) {}
+                }
+            }));
+        } catch (e) {
+            console.warn('AudioContext error:', e);
+        }
+    };
+
+    const unlockAudio = () => {
+        initAudio();
+        if (audioCtx && audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+        if (audioEnabled && !ambientPlaying && soundBuffers['ambient']) {
+            startAmbient();
+        }
+    };
+
+    ['click', 'wheel', 'touchstart', 'keydown', 'pointerdown'].forEach(evt => {
+        window.addEventListener(evt, unlockAudio, { once: true, passive: true });
+    });
+
+    const flashAudioPulse = () => {
+        if (!audioBtn) return;
+        audioBtn.classList.add('pulse-active');
+        clearTimeout(pulseTimeout);
+        pulseTimeout = setTimeout(() => {
+            audioBtn.classList.remove('pulse-active');
+        }, 320);
+    };
+
+    const playRomanSound = (key) => {
+        if (!audioEnabled) return;
+        unlockAudio();
+
+        const cfg = soundConfigs[key];
+        if (!cfg) return;
+
+        flashAudioPulse();
+
+        // 1. High-fidelity Web Audio BufferSource with Spatial Panning & Reverb Send
+        if (audioCtx && soundBuffers[key]) {
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const source = audioCtx.createBufferSource();
+                source.buffer = soundBuffers[key];
+
+                const sfxGain = audioCtx.createGain();
+                sfxGain.gain.setValueAtTime(cfg.vol, audioCtx.currentTime);
+
+                // Direct transparent routing for natural acoustic playback
+                const sfxFilter = audioCtx.createBiquadFilter();
+                sfxFilter.type = 'allpass';
+
+                // Gentle fade at the natural end of the file to prevent hard buffer cutoffs
+                if (key === 'morph') {
+                    sfxGain.gain.setValueAtTime(cfg.vol, audioCtx.currentTime + 1.40);
+                    sfxGain.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 1.82);
+                } else if (key === 'levitation') {
+                    sfxGain.gain.setValueAtTime(cfg.vol, audioCtx.currentTime + 1.50);
+                    sfxGain.gain.linearRampToValueAtTime(0.0001, audioCtx.currentTime + 2.05);
+                }
+
+                source.connect(sfxFilter);
+                sfxFilter.connect(sfxGain);
+
+                // Direct dry routing through 3D Spatial Panner (or Master)
+                if (spatialPanner) {
+                    sfxGain.connect(spatialPanner);
+                } else if (masterGain) {
+                    sfxGain.connect(masterGain);
+                } else {
+                    sfxGain.connect(audioCtx.destination);
+                }
+
+                // Wet acoustic send to Roman Cathedral Reverb (generous wet diffusion for levitation & morph)
+                if (reverbConvolver && key !== 'ambient') {
+                    const sendGain = audioCtx.createGain();
+                    const sendAmt = key === 'levitation' ? 0.42 : (key === 'morph' ? 0.28 : 0.22);
+                    sendGain.gain.setValueAtTime(sendAmt, audioCtx.currentTime);
+                    sfxGain.connect(sendGain);
+                    sendGain.connect(reverbConvolver);
+                }
+
+                // Cinematic Tailored Sidechain Ducking with Smooth Asymptotic Release
+                if (key === 'morph') {
+                    triggerDucking(0.70, 0.40, 0.45); // Smooth 30% breath for the authentic morph sound
+                } else if (key === 'levitation') {
+                    triggerDucking(0.48, 0.80, 0.45);
+                } else if (key === 'warrior') {
+                    triggerDucking(0.50, 0.85, 0.50);
+                } else if (key === 'pedestal') {
+                    triggerDucking(0.55, 0.45, 0.40);
+                }
+
+                source.start(0);
+                return;
+            } catch (e) {}
+        }
+
+        // 2. High-speed HTML5 Audio fallback
+        const el = audioElements[key];
+        if (el) {
+            try {
+                el.currentTime = 0;
+                el.volume = cfg.vol;
+                el.play().catch(() => {});
+            } catch (e) {}
+        }
+    };
+
+    audioBtn.addEventListener('click', () => {
+        unlockAudio();
+        audioEnabled = !audioEnabled;
+        audioBtn.classList.toggle('muted', !audioEnabled);
+        const label = audioBtn.querySelector('#audio-label');
+        if (label) label.textContent = audioEnabled ? 'SOUND · ON' : 'SOUND · OFF';
+        if (masterGain && audioCtx) {
+            masterGain.gain.setTargetAtTime(audioEnabled ? 1.0 : 0.0, audioCtx.currentTime, 0.05);
+        }
+        if (audioEnabled) {
+            startAmbient();
+            playRomanSound('morph');
+        } else {
+            stopAmbient();
+        }
+    });
+
     // DOM References
     const header = overlay.querySelector('.brand-header');
     const levitationInner = document.getElementById('levitation-inner');
@@ -566,6 +952,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (levitationAbout) levitationAbout.classList.toggle('dark-theme', isDark);
         if (warriorShowcase) warriorShowcase.classList.toggle('dark-theme', isDark);
         if (scrollCue) scrollCue.classList.toggle('dark-theme', isDark);
+        if (audioBtn) audioBtn.classList.toggle('dark-theme', isDark);
 
         // Stone Narrative Inversion for Inscription Layer (Act II)
         if (aboutLabel && aboutMain && aboutSub) {
@@ -600,6 +987,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const transitionTo = (targetProgress, duration = 1.15) => {
         if (activeTween) activeTween.kill();
         state.isTransitioning = true;
+        playRomanSound('morph');
 
         activeTween = gsap.to(state, {
             progress: targetProgress,
@@ -873,6 +1261,87 @@ document.addEventListener('DOMContentLoaded', () => {
             scrollCue.style.opacity = cueOpacity.toString();
             scrollCue.style.pointerEvents = cueOpacity > 0.15 ? 'auto' : 'none';
             scrollCue.style.transform = `translateY(${(1.0 - cueOpacity) * 8}px)`;
+        }
+
+        // 4. Mastered Roman Acoustic Engine 2.0 Real-time Modulation
+        if (ambientFilter && ambientGain && audioCtx && ambientPlaying) {
+            let baseFilterFreq = 600;
+            let baseGain = 0.22;
+
+            // Material Tone Offset: Carrara White (+65Hz brighter crystalline shimmer) vs Nero Marquina (-65Hz deeper obsidian rumble)
+            const materialTone = (state.progress - 0.5) * 130;
+
+            if (curScroll <= 1.0) {
+                const t = Math.max(0, Math.min(curScroll, 1.0));
+                // Warm, supportive rise to 1150Hz in Act II (keeps spectrum >1200Hz pristine for levitation harmonics)
+                baseFilterFreq = 600 + t * (1150 - 600) + materialTone;
+                baseGain = 0.22 - t * 0.01;
+            } else {
+                const t = Math.max(0, Math.min(curScroll - 1.0, 1.0));
+                // Rich lift into Act III Warrior
+                baseFilterFreq = 1150 + t * (1550 - 1150) + materialTone;
+                baseGain = 0.21 + t * 0.02;
+            }
+
+            // Kinetic Velocity Boost: brisk scrolling opens the acoustic filter like cutting through Roman air
+            const kineticBoost = Math.min(scrollVelocity * 4000, 650);
+            const targetFilterFreq = baseFilterFreq + kineticBoost;
+            const targetQ = 1.1 + Math.min(scrollVelocity * 3.5, 1.0);
+
+            ambientFilter.frequency.setTargetAtTime(targetFilterFreq, audioCtx.currentTime, 0.12);
+            ambientFilter.Q.setTargetAtTime(targetQ, audioCtx.currentTime, 0.12);
+            ambientGain.gain.setTargetAtTime(baseGain, audioCtx.currentTime, 0.25);
+        }
+
+        // 3D Spatial Audio Tracking (Stereo Panner linked to tablet rotation & mouse position)
+        if (spatialPanner && audioCtx && plane) {
+            const rotPan = (plane.rotation.y || 0) * 0.55;
+            const mousePan = (mouseX || 0) * 0.25;
+            const targetPan = Math.max(-0.65, Math.min(0.65, rotPan + mousePan));
+            spatialPanner.pan.setTargetAtTime(targetPan, audioCtx.currentTime, 0.08);
+        }
+
+        // 5. Anti-Clatter Hysteresis & Cooldown for Phase Transitions (Synchronized with visual flight)
+        const now = performance.now();
+        const timeSinceLastShift = now - lastPhaseShiftTime;
+
+        if (curScroll >= 0.35 && curScroll < 1.45 && activePhaseIndex !== 1) {
+            if (timeSinceLastShift > PHASE_COOLDOWN) {
+                activePhaseIndex = 1;
+                lastPhaseShiftTime = now;
+                playRomanSound('levitation');
+            }
+        } else if (curScroll >= 1.45 && activePhaseIndex !== 2) {
+            if (timeSinceLastShift > PHASE_COOLDOWN) {
+                activePhaseIndex = 2;
+                lastPhaseShiftTime = now;
+                playRomanSound('warrior');
+            }
+        } else if (curScroll <= 0.25 && activePhaseIndex !== 0) {
+            if (timeSinceLastShift > PHASE_COOLDOWN) {
+                activePhaseIndex = 0;
+                lastPhaseShiftTime = now;
+                playRomanSound('pedestal');
+            }
+        }
+
+        // 6. Real-time Acoustic Waveform Equalizer Update
+        if (masterAnalyser && eqBars && eqBars.length > 0) {
+            if (audioEnabled && ambientPlaying) {
+                masterAnalyser.getByteFrequencyData(freqData);
+                const b1 = Math.max(3, (freqData[2] / 255) * 13);
+                const b2 = Math.max(4, (freqData[5] / 255) * 15);
+                const b3 = Math.max(3, (freqData[10] / 255) * 14);
+                const b4 = Math.max(2, (freqData[16] / 255) * 11);
+                eqBars[0].style.height = `${b1.toFixed(1)}px`;
+                eqBars[1].style.height = `${b2.toFixed(1)}px`;
+                eqBars[2].style.height = `${b3.toFixed(1)}px`;
+                eqBars[3].style.height = `${b4.toFixed(1)}px`;
+            } else {
+                for (let i = 0; i < eqBars.length; i++) {
+                    eqBars[i].style.height = '2.5px';
+                }
+            }
         }
 
         renderer.render(scene, camera);
